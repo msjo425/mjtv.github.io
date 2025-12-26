@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>CSV Stream Player</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: sans-serif;
+  background: #000;
+  color: #fff;
+}
+
+.button-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 20px;
+}
+
+.stream-button {
+  width: 150px;
+  height: 150px;
+  margin: 10px;
+  background: #222;
+  color: white;
+  text-align: center;
+  padding: 10px;
+  cursor: pointer;
+  border-radius: 10px;
+}
+
+.stream-button img {
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.stream-button.active {
+  background: #555;
+  transform: scale(0.95);
+}
+
+#player {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: black;
+  z-index: 10;
+}
+
+#player video,
+#player audio {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+#controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(0,0,0,0.65);
+}
+
+.time-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.control-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+button {
+  background: #222;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.4;
+}
+
+input[type=range] {
+  flex: 1;
+}
+</style>
+</head>
+
+<body>
+
+<div id="grid" class="button-grid"></div>
+
+<div id="player">
+  <div id="controls">
+    <div class="time-row">
+      <span id="elapsed">00:00</span>
+      <span id="remaining">LIVE</span>
+    </div>
+
+    <input id="seekBar" type="range" min="0" max="100" value="0"
+           oninput="seekTo(this.value)">
+
+    <div class="control-row">
+      <button onclick="goHome()">⟵ Home</button>
+      <button id="back15" onclick="jump(-15)">⏪ 15s</button>
+      <button onclick="togglePlay()">⏯</button>
+      <button id="fwd15" onclick="jump(15)">15s ⏩</button>
+      <button onclick="toggleMute()">🔇</button>
+      <input type="range" min="0" max="1" step="0.05"
+             value="1" onchange="setVolume(this.value)">
+    </div>
+  </div>
+</div>
+
+<script>
+const grid = document.getElementById("grid");
+const player = document.getElementById("player");
+const seekBar = document.getElementById("seekBar");
+const elapsedEl = document.getElementById("elapsed");
+const remainingEl = document.getElementById("remaining");
+const back15 = document.getElementById("back15");
+const fwd15 = document.getElementById("fwd15");
+
+let mediaElement = null;
+let isSeekable = false;
+
+/* ---------- CSV LOADER ---------- */
+
+fetch("streams.csv")
+  .then(r => r.text())
+  .then(text => buildButtons(parseCSV(text)));
+
+function parseCSV(text) {
+  const lines = text.trim().split("\n");
+  const headers = lines.shift().split(",");
+  return lines.map(line => {
+    const values = line.split(",");
+    return Object.fromEntries(
+      headers.map((h,i) => [h.trim(), values[i].trim()])
+    );
+  });
+}
+
+function buildButtons(streams) {
+  streams.forEach(stream => {
+    const btn = document.createElement("div");
+    btn.className = "stream-button";
+    btn.innerHTML = `
+      <img src="${stream.logo}">
+      <div>${stream.name}</div>
+    `;
+    btn.onclick = e =>
+      playMedia(stream.url, stream.type, e);
+    grid.appendChild(btn);
+  });
+}
+
+/* ---------- PLAYER ---------- */
+
+function playMedia(url, type, event) {
+  stopPlayback(false);
+
+  document.querySelectorAll('.stream-button')
+    .forEach(b => b.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+
+  mediaElement = document.createElement(type);
+  mediaElement.autoplay = true;
+
+  const src = document.createElement("source");
+  src.src = url;
+  mediaElement.appendChild(src);
+
+  mediaElement.addEventListener("loadedmetadata", updateSeekState);
+  mediaElement.addEventListener("timeupdate", updateTimeUI);
+
+  player.innerHTML = "";
+  player.appendChild(mediaElement);
+  player.appendChild(document.getElementById("controls"));
+  player.style.display = "block";
+}
+
+function updateSeekState() {
+  isSeekable =
+    isFinite(mediaElement.duration) &&
+    mediaElement.duration > 0;
+
+  seekBar.disabled = !isSeekable;
+  back15.disabled = !isSeekable;
+  fwd15.disabled = !isSeekable;
+
+  if (!isSeekable) {
+    elapsedEl.textContent = "LIVE";
+    remainingEl.textContent = "LIVE";
+  } else {
+    seekBar.max = Math.floor(mediaElement.duration);
+  }
+}
+
+function updateTimeUI() {
+  if (!isSeekable) return;
+  const cur = mediaElement.currentTime;
+  const dur = mediaElement.duration;
+  seekBar.value = Math.floor(cur);
+  elapsedEl.textContent = formatTime(cur);
+  remainingEl.textContent = "-" + formatTime(dur - cur);
+}
+
+function seekTo(v) {
+  if (isSeekable) mediaElement.currentTime = v;
+}
+
+function jump(sec) {
+  if (!isSeekable) return;
+  mediaElement.currentTime =
+    Math.max(0, Math.min(
+      mediaElement.currentTime + sec,
+      mediaElement.duration
+    ));
+}
+
+function togglePlay() {
+  mediaElement.paused ? mediaElement.play() : mediaElement.pause();
+}
+
+function toggleMute() {
+  mediaElement.muted = !mediaElement.muted;
+}
+
+function setVolume(v) {
+  mediaElement.volume = v;
+}
+
+function goHome() {
+  stopPlayback(true);
+}
+
+function stopPlayback(notify) {
+  if (mediaElement) {
+    mediaElement.pause();
+    mediaElement.src = "";
+    mediaElement.load();
+    mediaElement = null;
+  }
+  player.style.display = "none";
+}
+
+function formatTime(sec) {
+  sec = Math.floor(sec);
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2,"0")}`;
+}
+</script>
+
+</body>
+</html>
