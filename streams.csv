@@ -1,0 +1,5 @@
+name,type,url,logo
+The Town,audio,https://storage.googleapis.com/tv-ipad/the-town/latest-episode.mp3,https://megaphone.imgix.net/podcasts/65cb6846-98da-11ec-ae8b-ab10844a5b35/image/e730c6ec386e0b71f4f745d173ac9648.jpg
+WQXR,audio,https://stream.wqxr.org/wqxr,https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS5NPJYDOFr8pxVmw_nNYsTiUAM_rKyv3nOUg
+CNN,video,http://192.168.0.194:8000/cnn,https://upload.wikimedia.org/wikipedia/commons/9/9d/CNN_Logo_%282014%29.svg
+CBS,video,https://cbsplaylistserver.aws.syncbak.com/mpl/20160401/17761229/1553760/media.m3u8,https://upload.wikimedia.org/wikipedia/commons/b/bd/CBS_Eyemark.svg
